@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Зарплата на заводе</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#EEF1F3;--card:#FFFFFF;--ink:#14212B;--muted:#5A6772;--line:#DDE3E8;
+  --accent:#1F5FBF;--accent-ink:#FFFFFF;--accent-soft:#E3EDFA;--accent-deep:#174A96;
+  --warn:#A8430A;--warn-soft:#FBE9DD;
+  --ui:'Golos Text',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --num:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10171D;--card:#1A242D;--ink:#E8EEF2;--muted:#9AA8B4;--line:#2C3944;
+    --accent:#6FA5F2;--accent-ink:#0B1B2E;--accent-soft:#1D3250;--accent-deep:#A9C9F7;
+    --warn:#F0A070;--warn-soft:#3A2416;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10171D;--card:#1A242D;--ink:#E8EEF2;--muted:#9AA8B4;--line:#2C3944;
+  --accent:#6FA5F2;--accent-ink:#0B1B2E;--accent-soft:#1D3250;--accent-deep:#A9C9F7;
+  --warn:#F0A070;--warn-soft:#3A2416;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.4 var(--ui)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.app{max-width:480px;margin:0 auto;padding:12px 12px 96px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border-radius:16px;padding:16px}
+.h{font-size:16px;font-weight:600;margin:0 0 10px}
+.muted{color:var(--muted);font-size:13px}
+.num{font-family:var(--num);font-weight:600;white-space:nowrap}
+
+.month{display:flex;align-items:center;justify-content:space-between}
+.month b{font-size:17px;font-weight:600}
+.iconbtn{width:44px;height:44px;border:0;border-radius:12px;background:var(--card);font-size:20px}
+
+.net{background:var(--accent);color:var(--accent-ink);border-radius:16px;padding:18px 20px}
+.net .big{font:600 34px/1.15 var(--num);margin:4px 0 8px;white-space:nowrap}
+.net .sub{display:flex;justify-content:space-between;gap:12px;font-size:13px;flex-wrap:wrap}
+
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wd{text-align:center;font-size:12px;color:var(--muted);padding:4px 0}
+.day{min-height:52px;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:4px 2px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.day .d{font-size:14px;font-weight:600}
+.day .l{font-size:10.5px;line-height:1.1}
+.day.s{background:var(--accent-soft);border-color:var(--accent-soft)}
+.day.t{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.day.a{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.day.o{border-style:dashed}
+.day.today{box-shadow:inset 0 0 0 2px var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-top:10px}
+
+.btn{min-height:48px;border-radius:12px;border:1.5px solid var(--accent);background:var(--card);color:var(--accent-deep);font-weight:600;padding:0 16px;width:100%}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.quiet{border-color:var(--line);color:var(--ink);font-weight:500}
+
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;font-size:14px}
+.row.total{border-top:1px solid var(--line);font-weight:600;font-size:15px;margin-top:4px;padding-top:4px}
+.row .ko{color:var(--muted)}
+.sect{font-size:13px;font-weight:600;margin-bottom:4px}
+.sect.plus{color:var(--accent-deep)}
+.sect.minus{color:var(--warn)}
+
+.field{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;border-bottom:1px solid var(--line)}
+.field:last-child{border-bottom:0}
+.field label{font-size:15px}
+.field small{display:block;color:var(--muted);font-size:12px}
+.field input[type=number],.field input[type=time],.field input[type=date],.field select{height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:0 10px;max-width:160px;text-align:right}
+.field input[type=number]{width:120px;font-family:var(--num)}
+.field input[type=checkbox]{width:24px;height:24px;accent-color:var(--accent)}
+
+.note{border-radius:12px;padding:12px 14px;font-size:14px}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.ok{background:var(--accent-soft);color:var(--accent-deep)}
+.stats{display:flex;gap:8px;margin-bottom:10px}
+.stats div{flex:1;background:var(--bg);border-radius:12px;padding:10px 12px}
+.stats small{display:block;color:var(--muted);font-size:12px}
+.stats b{font:600 20px var(--num)}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs div{max-width:480px;margin:0 auto;display:flex}
+.tabs button{flex:1;height:56px;border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:500}
+.tabs button[aria-selected=true]{color:var(--accent-deep);font-weight:700;box-shadow:inset 0 3px 0 var(--accent)}
+
+dialog{border:0;padding:0;margin:auto auto 0;width:100%;max-width:480px;border-radius:20px 20px 0 0;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(10,20,30,.55)}
+.sheet{padding:20px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg label{position:relative;display:flex;align-items:center;justify-content:center;min-height:44px;border:1px solid var(--line);border-radius:10px;font-size:14px;text-align:center;padding:0 4px}
+.seg input{position:absolute;opacity:0;inset:0;margin:0}
+.seg label:has(input:checked){background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.seg label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="month" id="monthbar">
+    <button class="iconbtn" aria-label="Предыдущий месяц" onclick="shift(-1)">‹</button>
+    <b id="mname"></b>
+    <button class="iconbtn" aria-label="Следующий месяц" onclick="shift(1)">›</button>
+  </div>
+  <section id="tab-cal"></section>
+  <section id="tab-pay" hidden></section>
+  <section id="tab-ext" hidden></section>
+  <section id="tab-set" hidden></section>
+</main>
+
+<nav class="tabs"><div role="tablist">
+  <button role="tab" data-t="cal" onclick="go('cal')">Смены</button>
+  <button role="tab" data-t="pay" onclick="go('pay')">Расчёт</button>
+  <button role="tab" data-t="ext" onclick="go('ext')">Выплаты</button>
+  <button role="tab" data-t="set" onclick="go('set')">Настройки</button>
+</div></nav>
+
+<dialog id="dlg" aria-labelledby="dlgt">
+  <div class="sheet">
+    <h2 class="h" id="dlgt" style="margin:0"></h2>
+    <div class="seg" role="radiogroup" aria-label="Что было в этот день">
+      <label><input type="radio" name="st" value="s" onchange="segChange()">Смена</label>
+      <label><input type="radio" name="st" value="o" onchange="segChange()">Выходной</label>
+      <label><input type="radio" name="st" value="a" onchange="segChange()">Пропуск</label>
+      <label><input type="radio" name="st" value="i" onchange="segChange()">Простой 70%</label>
+      <label><input type="radio" name="st" value="y" onchange="segChange()">Ёнча</label>
+      <label><input type="radio" name="st" value="p" onchange="segChange()">Праздник</label>
+    </div>
+    <div id="shiftf">
+      <div class="field"><label for="fa">Начало смены</label><input id="fa" type="time"></div>
+      <div class="field"><label for="fb">Конец смены</label><input id="fb" type="time"></div>
+      <div class="field"><label for="fbr">Перерывы, мин<small>не оплачиваются</small></label><input id="fbr" type="number" min="0" step="10" inputmode="numeric"></div>
+      <div class="field"><label for="fh">Тыкын<small>работа в выходной или праздник</small></label><input id="fh" type="checkbox"></div>
+    </div>
+    <button class="btn primary" onclick="saveDay()">Сохранить день</button>
+    <button class="btn quiet" onclick="document.getElementById('dlg').close()">Отмена</button>
+  </div>
+</dialog>
+
+<script>
+var MIN_WAGE=10320;
+var R={pension:0.0475,health:0.03595,care:0.1314,emp:0.009,free:0.033};
+var MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+var DEF={scheme:'ins',rate:10320,country:'RU',visa:'F-4',pension:true,emp:false,sStart:'08:00',sEnd:'20:00',sBreak:90,weekly:true,monthly:false,monthlyAmt:100000,bonusPct:0,startDate:''};
+var KEY='zp-proto-v1';
+var st={s:Object.assign({},DEF),days:{},paid:{},tax:{}};
+try{var raw=localStorage.getItem(KEY);if(raw){var p=JSON.parse(raw);st.s=Object.assign({},DEF,p.s||{});st.days=p.days||{};st.paid=p.paid||{};st.tax=p.tax||{};}}catch(e){}
+var tg=window.Telegram&&window.Telegram.WebApp;
+var cloud=(tg&&tg.initData&&tg.isVersionAtLeast&&tg.isVersionAtLeast('6.9'))?tg.CloudStorage:null;
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}
+  if(!cloud)return;
+  var pre=ym()+'-',md={};
+  Object.keys(st.days).forEach(function(key){if(key.indexOf(pre)===0)md[key.slice(8)]=st.days[key];});
+  try{
+    cloud.setItem('s',JSON.stringify(st.s));
+    cloud.setItem('m',JSON.stringify({paid:st.paid,tax:st.tax}));
+    if(Object.keys(md).length)cloud.setItem('d-'+ym(),JSON.stringify(md));else cloud.removeItem('d-'+ym());
+  }catch(e){}
+}
+function cloudLoad(){
+  if(!cloud)return;
+  cloud.getKeys(function(err,keys){
+    if(err||!keys||!keys.length)return;
+    cloud.getItems(keys,function(err2,vals){
+      if(err2||!vals)return;
+      try{
+        var days={};
+        keys.forEach(function(key){
+          var v=vals[key];if(!v)return;var o=JSON.parse(v);
+          if(key==='s')st.s=Object.assign({},DEF,o);
+          else if(key==='m'){st.paid=o.paid||{};st.tax=o.tax||{};}
+          else if(key.indexOf('d-')===0)Object.keys(o).forEach(function(dd){days[key.slice(2)+'-'+dd]=o[dd];});
+        });
+        st.days=days;
+        try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}
+        render();
+      }catch(e){}
+    });
+  });
+}
+function applyTheme(){
+  if(!tg)return;
+  var r=document.documentElement,p=tg.themeParams||{};
+  if(tg.colorScheme)r.setAttribute('data-theme',tg.colorScheme);
+  if(p.secondary_bg_color)r.style.setProperty('--bg',p.secondary_bg_color);
+  if(p.bg_color)r.style.setProperty('--card',p.bg_color);
+  if(p.text_color)r.style.setProperty('--ink',p.text_color);
+  if(p.hint_color)r.style.setProperty('--muted',p.hint_color);
+}
+
+var now=new Date();
+var view={y:now.getFullYear(),m:now.getMonth(),tab:'cal'};
+var editKey=null;
+
+function k(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function ym(){return view.y+'-'+String(view.m+1).padStart(2,'0');}
+function fmt(n){return Math.round(n).toLocaleString('ru-RU');}
+function fh(h){return (Math.round(h*10)/10).toLocaleString('ru-RU');}
+function mins(t){var a=String(t||'0:0').split(':');return (+a[0])*60+(+a[1]||0);}
+function floor10(x){return Math.floor(x/10)*10;}
+
+function shiftHours(rec){
+  var a=mins(rec.a),b=mins(rec.b);if(b<=a)b+=1440;
+  var paidMin=Math.max(0,b-a-(+rec.br||0));
+  var wins=[[0,360],[1320,1800],[2760,3240]],night=0;
+  wins.forEach(function(w){night+=Math.max(0,Math.min(b,w[1])-Math.max(a,w[0]));});
+  return {paid:paidMin/60,night:Math.min(night,paidMin)/60};
+}
+
+function compute(y,m){
+  var rate=+st.s.rate||0;
+  var T={baseH:0,otH:0,nightH:0,t15:0,t20:0,idleD:0,leaveD:0,holD:0,abs:0,shifts:0,weeksOk:0,weeksLost:0};
+  var first=new Date(y,m,1),last=new Date(y,m+1,0);
+  var ws=new Date(y,m,1-((first.getDay()+6)%7));
+  while(ws<=last){
+    var weekReg=0,absent=false,worked=0;
+    for(var i=0;i<7;i++){
+      var d=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+i);
+      var rec=st.days[k(d)];if(!rec)continue;
+      var inM=d.getMonth()===m&&d.getFullYear()===y;
+      if(rec.t==='s'){
+        var h=shiftHours(rec);worked+=h.paid;
+        if(rec.h){
+          var h15=Math.min(h.paid,8);
+          if(inM){T.t15+=h15;T.t20+=h.paid-h15;}
+        }else{
+          var reg=Math.min(Math.min(h.paid,8),Math.max(0,40-weekReg));
+          weekReg+=reg;
+          if(inM){T.baseH+=reg;T.otH+=h.paid-reg;}
+        }
+        if(inM){T.nightH+=h.night;T.shifts++;}
+      }else if(rec.t==='a'){absent=true;if(inM)T.abs++;}
+      else if(rec.t==='i'){worked+=8;if(inM)T.idleD++;}
+      else if(rec.t==='y'){worked+=8;if(inM)T.leaveD++;}
+      else if(rec.t==='p'){if(inM)T.holD++;}
+    }
+    var sun=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+6);
+    if(st.s.weekly&&sun.getMonth()===m&&sun.getFullYear()===y){
+      if(!absent&&worked>=15)T.weeksOk++;else if(absent)T.weeksLost++;
+    }
+    ws=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+7);
+  }
+  var L=[];
+  function add(name,ko,amt,hint){if(amt>0)L.push({name:name,ko:ko,amt:amt,hint:hint});}
+  add('Основная оплата','기본급',T.baseH*rate,fh(T.baseH)+' ч');
+  add('Переработка ×1,5','연장수당',T.otH*rate*1.5,fh(T.otH)+' ч');
+  add('Ночные +0,5','야간수당',T.nightH*rate*0.5,fh(T.nightH)+' ч');
+  add('Тыкын ×1,5 и ×2','휴일수당',(T.t15*1.5+T.t20*2)*rate,fh(T.t15+T.t20)+' ч');
+  add('Недельный бонус','주휴수당',T.weeksOk*8*rate,T.weeksOk+' нед.');
+  var mb=(st.s.monthly&&T.abs===0&&T.shifts>0)?(+st.s.monthlyAmt||0):0;
+  add('Месячный бонус','만근수당',mb,'без пропусков');
+  add('Ёнча','연차',T.leaveD*8*rate,T.leaveD+' дн.');
+  add('Праздники','유급휴일',T.holD*8*rate,T.holD+' дн.');
+  add('Простой 70%','휴업수당',T.idleD*8*rate*0.7,T.idleD+' дн.');
+  var gross=L.reduce(function(s,l){return s+l.amt;},0);
+  var D=[];
+  if(st.s.scheme==='free'){
+    D.push({name:'Налог 3,3%',ko:'사업소득세',amt:floor10(gross*R.free)});
+  }else{
+    if(st.s.pension)D.push({name:'Пенсия 4,75%',ko:'국민연금',amt:floor10(gross*R.pension)});
+    var health=floor10(gross*R.health);
+    D.push({name:'Медстраховка 3,595%',ko:'건강보험',amt:health});
+    D.push({name:'Долгосрочный уход',ko:'장기요양',amt:floor10(health*R.care)});
+    if(st.s.emp)D.push({name:'Страхование занятости 0,9%',ko:'고용보험',amt:floor10(gross*R.emp)});
+    var tax=+st.tax[y+'-'+String(m+1).padStart(2,'0')]||0;
+    if(tax>0)D.push({name:'Подоходный и местный налог',ko:'소득세',amt:tax});
+  }
+  var ded=gross>0?D.reduce(function(s,l){return s+l.amt;},0):0;
+  if(gross<=0)D=[];
+  return {T:T,L:L,D:D,gross:gross,ded:ded,net:gross-ded,mbLost:st.s.monthly&&T.abs>0};
+}
+
+function tenure(){
+  if(!st.s.startDate)return null;
+  var s=new Date(st.s.startDate+'T00:00:00'),t=new Date();
+  if(isNaN(s)||s>t)return null;
+  var months=(t.getFullYear()-s.getFullYear())*12+(t.getMonth()-s.getMonth())-(t.getDate()<s.getDate()?1:0);
+  var years=Math.floor(months/12);
+  var days=Math.floor((t-s)/86400000);
+  var ent,ps;
+  if(years<1){ent=Math.min(months,11);ps=s;}
+  else{ent=Math.min(25,15+Math.floor((years-1)/2));ps=new Date(s.getFullYear()+years,s.getMonth(),s.getDate());}
+  var from=k(ps),used=0;
+  Object.keys(st.days).forEach(function(key){if(st.days[key].t==='y'&&key>=from)used++;});
+  return {months:months,years:years,days:days,ent:ent,used:used,left:Math.max(0,ent-used)};
+}
+
+function autoRules(){
+  st.s.pension=!(st.s.country==='KZ'||(st.s.country==='UZ'&&st.s.visa==='E-9'));
+  st.s.emp=['F-2','F-5','F-6'].indexOf(st.s.visa)>=0;
+}
+
+/* ---------- rendering ---------- */
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function netCard(c){
+  return '<div class="net"><div>На руки за месяц</div><div class="big">'+fmt(c.net)+' ₩</div>'+
+    '<div class="sub"><span>Начислено '+fmt(c.gross)+' ₩</span><span>Удержано '+fmt(c.ded)+' ₩</span></div></div>';
+}
+var LBL={a:'проп.',i:'простой',y:'ёнча',p:'празд.',o:'вых.'};
+var FULL={s:'смена',a:'пропуск',i:'простой',y:'ёнча',p:'праздник',o:'выходной'};
+
+function renderCal(c){
+  var first=new Date(view.y,view.m,1),n=new Date(view.y,view.m+1,0).getDate();
+  var off=(first.getDay()+6)%7,todayK=k(new Date());
+  var h='<div class="card"><div class="grid">';
+  ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(function(w){h+='<div class="wd">'+w+'</div>';});
+  for(var i=0;i<off;i++)h+='<div></div>';
+  for(var d=1;d<=n;d++){
+    var key=k(new Date(view.y,view.m,d)),rec=st.days[key],cls='day',lab='',aria=d+' '+MONTHS[view.m];
+    if(rec){
+      if(rec.t==='s'){var sh=shiftHours(rec);cls+=rec.h?' t':' s';lab=fh(sh.paid)+' ч'+(rec.h?'<br>тыкын':'');aria+=', смена '+fh(sh.paid)+' ч'+(rec.h?', тыкын':'');}
+      else{cls+=rec.t==='a'?' a':' o';lab=LBL[rec.t];aria+=', '+FULL[rec.t];}
+    }else aria+=', не заполнено';
+    if(key===todayK)cls+=' today';
+    h+='<button class="'+cls+'" aria-label="'+aria+'" onclick="openDay(\''+key+'\')"><span class="d">'+d+'</span><span class="l">'+lab+'</span></button>';
+  }
+  h+='</div><div class="legend"><span>Нажмите на день, чтобы отметить смену</span></div></div>';
+  var msg='';
+  if(c.T.weeksLost>0)msg+='<div class="note warn">Недельный бонус сгорел за '+c.T.weeksLost+' нед. из-за пропуска.</div>';
+  if(c.mbLost)msg+='<div class="note warn">Месячный бонус сгорел: в месяце есть пропуск.</div>';
+  document.getElementById('tab-cal').innerHTML='<div style="display:flex;flex-direction:column;gap:12px">'+netCard(c)+h+msg+
+    '<button class="btn" onclick="fillWeek()">Заполнить будни стандартной сменой</button>'+
+    '<button class="btn quiet" onclick="clearMonth()">Очистить месяц</button></div>';
+}
+
+function rows(list){
+  return list.map(function(l){
+    return '<div class="row"><span>'+esc(l.name)+' <span class="ko">'+l.ko+(l.hint?', '+esc(l.hint):'')+'</span></span><span class="num">'+fmt(l.amt)+'</span></div>';
+  }).join('');
+}
+function renderPay(c){
+  var key=ym(),h='<div style="display:flex;flex-direction:column;gap:12px">';
+  if(c.gross<=0){
+    h+='<div class="card"><p class="h">За этот месяц пока нет смен</p><p class="muted" style="margin:0">Отметьте отработанные дни на вкладке «Смены», и здесь появится расчётный листок.</p></div>';
+  }else{
+    h+='<div class="card"><div class="sect plus">Начисления, ₩</div>'+rows(c.L)+
+      '<div class="row total"><span>Итого начислено</span><span class="num">'+fmt(c.gross)+'</span></div></div>';
+    h+='<div class="card"><div class="sect minus">Удержания, ₩</div>'+rows(c.D)+
+      '<div class="row total"><span>Итого удержано</span><span class="num">'+fmt(c.ded)+'</span></div>';
+    if(st.s.scheme==='ins')h+='<div class="field" style="margin-top:8px"><label for="tax">Подоходный и местный налог<small>возьмите сумму из своего листка</small></label>'+
+      '<input id="tax" type="number" min="0" step="10" inputmode="numeric" value="'+(st.tax[key]||'')+'" placeholder="0" onchange="setMonthVal(\'tax\',this.value)"></div>';
+    h+='</div>'+netCard(c);
+    var paid=+st.paid[key]||0,diff=Math.round(c.net-paid),res='';
+    if(paid>0){
+      if(diff>0)res='<div class="note warn">Недоплата: <b class="num">'+fmt(diff)+' ₩</b>. Сравните строки выше с листком от работодателя (급여명세서).</div>';
+      else if(diff<0)res='<div class="note ok">Получено на <b class="num">'+fmt(-diff)+' ₩</b> больше расчёта. Проверьте, все ли смены и бонусы внесены.</div>';
+      else res='<div class="note ok">Сходится с расчётом.</div>';
+    }
+    h+='<div class="card"><p class="h">Сверка с выплатой</p><div class="field"><label for="paid">Пришло на карту, ₩</label>'+
+      '<input id="paid" type="number" min="0" step="10" inputmode="numeric" value="'+(st.paid[key]||'')+'" placeholder="0" onchange="setMonthVal(\'paid\',this.value)"></div>'+
+      (res?'<div style="margin-top:10px">'+res+'</div>':'')+'</div>';
+  }
+  h+='<p class="muted" style="margin:0 4px">Расчёт ориентировочный и не заменяет консультацию юриста или 노무사. Правила взяты для предприятий от 5 работников, ставки удержаний 2026 года.</p></div>';
+  document.getElementById('tab-pay').innerHTML=h;
+}
+
+function renderExt(c){
+  var rate=+st.s.rate||0,t=tenure(),h='<div style="display:flex;flex-direction:column;gap:12px">';
+  if(!t){
+    h+='<div class="card"><p class="h">Укажите дату начала работы</p><p class="muted" style="margin:0 0 12px">По ней считаются ёнча и выходное пособие.</p><button class="btn" onclick="go(\'set\')">Открыть настройки</button></div>';
+  }else{
+    h+='<div class="card"><p class="h">Ёнча (연차), оплачиваемый отпуск</p><div class="stats">'+
+      '<div><small>Положено</small><b>'+t.ent+'</b></div><div><small>Использовано</small><b>'+t.used+'</b></div><div><small>Осталось</small><b>'+t.left+'</b></div></div>'+
+      '<div class="row"><span>Компенсация за неиспользованные дни</span><span class="num">'+fmt(t.left*8*rate)+' ₩</span></div>'+
+      '<p class="muted" style="margin:6px 0 0">Стаж: '+t.years+' г. '+(t.months%12)+' мес. Использованные дни считаются по отметкам «Ёнча» в календаре.</p></div>';
+    h+='<div class="card"><p class="h">Тведжигым (퇴직금), выходное пособие</p>';
+    if(t.days<365)h+='<p class="muted" style="margin:0">Положено после года работы. Осталось '+(365-t.days)+' дн.</p>';
+    else if(c.gross<=0)h+='<p class="muted" style="margin:0">Внесите смены за месяц, чтобы оценить сумму.</p>';
+    else h+='<div class="row"><span>Если уволиться сегодня</span><span class="num" style="font-size:18px">≈ '+fmt(c.gross*t.days/365)+' ₩</span></div>'+
+      '<p class="muted" style="margin:6px 0 0">Оценка по начислениям за '+MONTHS[view.m].toLowerCase()+'. Точная сумма считается по средней зарплате за последние 3 месяца.</p>';
+    h+='</div>';
+  }
+  var pct=+st.s.bonusPct||0;
+  h+='<div class="card"><p class="h">13-я зарплата (상여금)</p>';
+  if(pct>0)h+='<div class="row"><span>За год, '+pct+'% от оклада</span><span class="num">'+fmt(pct/100*rate*209)+' ₩</span></div>'+
+    '<p class="muted" style="margin:6px 0 0">Оклад взят как ставка × 209 часов. Даты выплат смотрите в контракте.</p>';
+  else h+='<p class="muted" style="margin:0">Если бонус есть в контракте, укажите его процент в настройках.</p>';
+  h+='</div></div>';
+  document.getElementById('tab-ext').innerHTML=h;
+}
+
+function opt(v,l,cur){return '<option value="'+v+'"'+(v===cur?' selected':'')+'>'+l+'</option>';}
+function renderSet(){
+  var s=st.s,ins=s.scheme==='ins',h='<div style="display:flex;flex-direction:column;gap:12px">';
+  if((+s.rate||0)<MIN_WAGE)h+='<div class="note warn">Ставка ниже минимальной по закону: в 2026 году это '+fmt(MIN_WAGE)+' ₩ в час.</div>';
+  h+='<div class="card"><p class="h">Работа</p>'+
+    '<div class="field"><label for="s-scheme">Оформление</label><select id="s-scheme" onchange="setS(\'scheme\',this.value)">'+opt('ins','Садэпохом (4대보험)',s.scheme)+opt('free','3,3%',s.scheme)+'</select></div>'+
+    '<div class="field"><label for="s-rate">Ставка в час, ₩</label><input id="s-rate" type="number" min="0" step="10" inputmode="numeric" value="'+s.rate+'" onchange="setS(\'rate\',+this.value)"></div>'+
+    '<div class="field"><label for="s-start">Дата начала работы</label><input id="s-start" type="date" value="'+esc(s.startDate)+'" onchange="setS(\'startDate\',this.value)"></div></div>';
+  h+='<div class="card"><p class="h">Гражданство и виза</p>'+
+    '<div class="field"><label for="s-c">Гражданство</label><select id="s-c" onchange="setS(\'country\',this.value,true)">'+
+      opt('RU','Россия',s.country)+opt('KZ','Казахстан',s.country)+opt('UZ','Узбекистан',s.country)+opt('UA','Украина',s.country)+opt('KG','Кыргызстан',s.country)+'</select></div>'+
+    '<div class="field"><label for="s-v">Виза</label><select id="s-v" onchange="setS(\'visa\',this.value,true)">'+
+      ['F-2','F-4','F-5','F-6','H-2','E-9','G-1','F-1','D-2/D-4','Другая'].map(function(v){return opt(v,v,s.visa);}).join('')+'</select></div>';
+  if(ins)h+='<div class="field"><label for="s-p">Удерживают пенсию<small>подставлено по гражданству, можно изменить</small></label><input id="s-p" type="checkbox"'+(s.pension?' checked':'')+' onchange="setS(\'pension\',this.checked)"></div>'+
+    '<div class="field"><label for="s-e">Удерживают страхование занятости<small>подставлено по визе, можно изменить</small></label><input id="s-e" type="checkbox"'+(s.emp?' checked':'')+' onchange="setS(\'emp\',this.checked)"></div>';
+  else h+='<p class="muted" style="margin:10px 0 0">При оформлении 3,3% страховки не удерживаются.</p>';
+  h+='</div>';
+  h+='<div class="card"><p class="h">Бонусы</p>'+
+    '<div class="field"><label for="s-w">Недельный бонус (чухю)<small>8 часов за неделю без пропусков</small></label><input id="s-w" type="checkbox"'+(s.weekly?' checked':'')+' onchange="setS(\'weekly\',this.checked)"></div>'+
+    '<div class="field"><label for="s-m">Месячный бонус<small>за месяц без пропусков</small></label><input id="s-m" type="checkbox"'+(s.monthly?' checked':'')+' onchange="setS(\'monthly\',this.checked)"></div>'+
+    (s.monthly?'<div class="field"><label for="s-ma">Сумма месячного бонуса, ₩</label><input id="s-ma" type="number" min="0" step="1000" inputmode="numeric" value="'+s.monthlyAmt+'" onchange="setS(\'monthlyAmt\',+this.value)"></div>':'')+
+    '<div class="field"><label for="s-b">13-я зарплата, % от оклада в год<small>0, если бонуса нет</small></label><input id="s-b" type="number" min="0" step="50" inputmode="numeric" value="'+s.bonusPct+'" onchange="setS(\'bonusPct\',+this.value)"></div></div>';
+  h+='<div class="card"><p class="h">Стандартная смена</p>'+
+    '<div class="field"><label for="s-a">Начало</label><input id="s-a" type="time" value="'+esc(s.sStart)+'" onchange="setS(\'sStart\',this.value)"></div>'+
+    '<div class="field"><label for="s-z">Конец</label><input id="s-z" type="time" value="'+esc(s.sEnd)+'" onchange="setS(\'sEnd\',this.value)"></div>'+
+    '<div class="field"><label for="s-br">Перерывы, мин</label><input id="s-br" type="number" min="0" step="10" inputmode="numeric" value="'+s.sBreak+'" onchange="setS(\'sBreak\',+this.value)"></div></div>';
+  h+='<button class="btn quiet" onclick="resetAll()">Стереть все данные</button></div>';
+  document.getElementById('tab-set').innerHTML=h;
+}
+
+function render(){
+  var c=compute(view.y,view.m);
+  document.getElementById('mname').textContent=MONTHS[view.m]+' '+view.y;
+  document.getElementById('monthbar').hidden=view.tab==='set';
+  ['cal','pay','ext','set'].forEach(function(t){document.getElementById('tab-'+t).hidden=view.tab!==t;});
+  document.querySelectorAll('.tabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.t===view.tab?'true':'false');});
+  if(view.tab==='cal')renderCal(c);
+  else if(view.tab==='pay')renderPay(c);
+  else if(view.tab==='ext')renderExt(c);
+  else renderSet();
+}
+
+/* ---------- actions ---------- */
+function go(t){view.tab=t;render();window.scrollTo(0,0);}
+function shift(n){var d=new Date(view.y,view.m+n,1);view.y=d.getFullYear();view.m=d.getMonth();render();}
+function setS(key,val,auto){st.s[key]=val;if(auto)autoRules();save();render();}
+function setMonthVal(kind,val){var v=+val||0;if(v>0)st[kind][ym()]=v;else delete st[kind][ym()];save();render();}
+
+function segChange(){
+  var v=(document.querySelector('input[name=st]:checked')||{}).value;
+  document.getElementById('shiftf').hidden=v!=='s';
+}
+function openDay(key){
+  editKey=key;
+  var rec=st.days[key],p=key.split('-'),d=new Date(+p[0],+p[1]-1,+p[2]);
+  var wk=(d.getDay()+6)%7>=5;
+  document.getElementById('dlgt').textContent=d.getDate()+' '+MONTHS[d.getMonth()].toLowerCase()+', '+['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'][(d.getDay()+6)%7];
+  var t=rec?rec.t:'s';
+  document.querySelectorAll('input[name=st]').forEach(function(r){r.checked=r.value===t;});
+  document.getElementById('fa').value=rec&&rec.a||st.s.sStart;
+  document.getElementById('fb').value=rec&&rec.b||st.s.sEnd;
+  document.getElementById('fbr').value=rec&&rec.br!=null?rec.br:st.s.sBreak;
+  document.getElementById('fh').checked=rec?!!rec.h:wk;
+  segChange();
+  document.getElementById('dlg').showModal();
+}
+function saveDay(){
+  var v=(document.querySelector('input[name=st]:checked')||{}).value||'o';
+  if(v==='s')st.days[editKey]={t:'s',a:document.getElementById('fa').value||st.s.sStart,b:document.getElementById('fb').value||st.s.sEnd,br:+document.getElementById('fbr').value||0,h:document.getElementById('fh').checked?1:0};
+  else st.days[editKey]={t:v};
+  save();document.getElementById('dlg').close();render();
+}
+function fillWeek(){
+  var n=new Date(view.y,view.m+1,0).getDate();
+  for(var d=1;d<=n;d++){
+    var dt=new Date(view.y,view.m,d),key=k(dt);
+    if((dt.getDay()+6)%7<5&&!st.days[key])st.days[key]={t:'s',a:st.s.sStart,b:st.s.sEnd,br:+st.s.sBreak||0,h:0};
+  }
+  save();render();
+}
+function clearMonth(){
+  var pre=ym()+'-';
+  Object.keys(st.days).forEach(function(key){if(key.indexOf(pre)===0)delete st.days[key];});
+  save();render();
+}
+function resetAll(){
+  st={s:Object.assign({},DEF),days:{},paid:{},tax:{}};
+  try{localStorage.removeItem(KEY);}catch(e){}
+  if(cloud)cloud.getKeys(function(e,keys){if(!e&&keys&&keys.length)cloud.removeItems(keys);});
+  render();
+}
+if(tg){
+  try{tg.ready();tg.expand();}catch(e){}
+  if(tg.initData){applyTheme();try{tg.onEvent('themeChanged',applyTheme);}catch(e){}}
+}
+render();
+cloudLoad();
+</script>
+</body>
+</html>
