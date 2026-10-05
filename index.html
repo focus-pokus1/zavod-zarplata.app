@@ -166,7 +166,8 @@ details.more>summary{min-height:44px;display:flex;align-items:center;color:var(-
     </details>
     <div id="shiftf">
       <div class="field"><label for="fh">Тыкын<small>работа в выходной или праздник</small></label><input id="fh" type="checkbox"></div>
-      <details class="more"><summary>Изменить часы этой смены</summary>
+      <div class="field"><label for="fhrs">Оплачено часов<small>как в ведомости; пусто — посчитать по времени смены</small></label><input id="fhrs" type="number" min="0" max="24" step="0.5" inputmode="decimal" placeholder="авто"></div>
+      <details class="more"><summary>Изменить время этой смены</summary>
         <div class="field"><label for="fa">Начало</label><input id="fa" type="time"></div>
         <div class="field"><label for="fb">Конец</label><input id="fb" type="time"></div>
         <div class="field"><label for="fbr">Перерывы, мин<small>не оплачиваются</small></label><input id="fbr" type="number" min="0" step="10" inputmode="numeric"></div>
@@ -184,7 +185,7 @@ details.more>summary{min-height:44px;display:flex;align-items:center;color:var(-
 var MIN_WAGE=10320;
 var R={pension:0.0475,health:0.03595,care:0.1314,emp:0.009,free:0.033};
 var MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-var DEF={scheme:'ins',rate:10320,country:'RU',visa:'F-4',pension:true,emp:false,dStart:'08:00',dEnd:'20:00',dBreak:90,nStart:'20:00',nEnd:'08:00',nBreak:90,onboarded:false,weekly:true,monthly:false,monthlyAmt:100000,bonusPct:0,startDate:''};
+var DEF={scheme:'ins',rate:10320,country:'RU',visa:'F-4',pension:true,emp:false,dStart:'08:00',dEnd:'20:00',dBreak:90,nStart:'20:00',nEnd:'08:00',nBreak:90,onboarded:false,pct:4,workDays:5,weekly:true,monthly:false,monthlyAmt:100000,bonusPct:0,startDate:''};
 var KEY='zp-proto-v1';
 function norm(o){var s=Object.assign({},DEF,o||{});if(o&&o.sStart){if(!o.dStart){s.dStart=o.sStart;s.dEnd=o.sEnd;s.dBreak=o.sBreak;}if(o.onboarded===undefined)s.onboarded=true;}return s;}
 var st={s:Object.assign({},DEF),days:{},paid:{},tax:{}};
@@ -249,9 +250,11 @@ function shiftHours(rec){
   var paidMin=Math.max(0,b-a-(+rec.br||0));
   var wins=[[0,360],[1320,1800],[2760,3240]],night=0;
   wins.forEach(function(w){night+=Math.max(0,Math.min(b,w[1])-Math.max(a,w[0]));});
+  if(rec.hrs!=null){var hp=Math.max(0,+rec.hrs||0);return {paid:hp,night:Math.min(night/60,hp)};}
   return {paid:paidMin/60,night:Math.min(night,paidMin)/60};
 }
 
+function autoAbs(d){var key=k(d);return (d.getDay()+6)%7<(+st.s.workDays||5)&&key<k(new Date())&&(!st.s.startDate||key>=st.s.startDate);}
 function compute(y,m){
   var rate=+st.s.rate||0;
   var T={baseH:0,otH:0,nightH:0,t15:0,t20:0,idleD:0,leaveD:0,holD:0,abs:0,shifts:0,weeksOk:0,weeksLost:0};
@@ -261,8 +264,9 @@ function compute(y,m){
     var weekReg=0,absent=false,worked=0;
     for(var i=0;i<7;i++){
       var d=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+i);
-      var rec=st.days[k(d)];if(!rec)continue;
+      var rec=st.days[k(d)];
       var inM=d.getMonth()===m&&d.getFullYear()===y;
+      if(!rec){if(autoAbs(d)){absent=true;if(inM)T.abs++;}continue;}
       if(rec.t==='s'){
         var h=shiftHours(rec);worked+=h.paid;
         if(rec.h){
@@ -299,7 +303,9 @@ function compute(y,m){
   add('Простой 70%','휴업수당',T.idleD*8*rate*0.7,T.idleD+' дн.','Смену отменили не по вашей вине: 70% от оплаты за 8 часов.');
   var gross=L.reduce(function(s,l){return s+l.amt;},0);
   var D=[];
-  if(st.s.scheme==='free'){
+  if(st.s.scheme==='pct'){
+    D.push({name:'Удержание '+String(+st.s.pct||0).replace('.',',')+'%',ko:'공제',ex:'Процент, который удерживает ваш работодатель или фирма-посредник. Из чего он складывается, уточните у них.',amt:Math.round(gross*(+st.s.pct||0)/100)});
+  }else if(st.s.scheme==='free'){
     D.push({name:'Налог 3,3%',ko:'사업소득세',ex:'Налог при оформлении как фрилансер. Часть можно вернуть через декларацию в мае.',amt:floor10(gross*R.free)});
   }else{
     if(st.s.pension)D.push({name:'Пенсия 4,75%',ko:'국민연금',ex:'Взнос в пенсионный фонд Кореи. Удерживают или нет, зависит от гражданства.',amt:floor10(gross*R.pension)});
@@ -356,11 +362,12 @@ function renderCal(c){
     if(rec){
       if(rec.t==='s'){var sh=shiftHours(rec);cls+=rec.h?' t':' s';lab=fh(sh.paid)+' ч'+(rec.h?'<br>тыкын':'');aria+=', смена '+fh(sh.paid)+' ч'+(rec.h?', тыкын':'');}
       else{cls+=rec.t==='a'?' a':' o';lab=LBL[rec.t];aria+=', '+FULL[rec.t];}
-    }else aria+=', не заполнено';
+    }else if(autoAbs(new Date(view.y,view.m,d))){cls+=' a';lab='проп.?';aria+=', не отмечено, считается пропуском';}
+    else aria+=', не заполнено';
     if(key===todayK)cls+=' today';
     h+='<button class="'+cls+'" aria-label="'+aria+'" onclick="tapDay(\''+key+'\')"><span class="d">'+d+'</span><span class="l">'+lab+'</span></button>';
   }
-  h+='</div><div class="legend"><span>Нажатие отмечает дневную смену. Повторное нажатие открывает подробности.</span></div></div>';
+  h+='</div><div class="legend"><span>Нажатие отмечает дневную смену. Повторное нажатие открывает подробности.</span><span>Пустой рабочий день в прошлом считается пропуском («проп.?»). Если это был выходной или праздник, отметьте его.</span></div></div>';
   var msg='';
   if(c.T.weeksLost>0)msg+='<div class="note warn">Недельный бонус сгорел за '+c.T.weeksLost+' нед. из-за пропуска.</div>';
   if(c.mbLost)msg+='<div class="note warn">Месячный бонус сгорел: в месяце есть пропуск.</div>';
@@ -445,11 +452,13 @@ function renderSet(){
   var s=st.s,ins=s.scheme==='ins',h='<div style="display:flex;flex-direction:column;gap:12px"><button class="back" onclick="go(\'cal\')">‹ Назад к сменам</button>';
   if((+s.rate||0)<MIN_WAGE)h+='<div class="note warn">Ставка ниже минимальной по закону: в 2026 году это '+fmt(MIN_WAGE)+' ₩ в час.</div>';
   h+='<div class="card"><p class="h">Работа</p>'+
-    '<div class="field"><label for="s-scheme">Оформление</label><select id="s-scheme" onchange="setS(\'scheme\',this.value)">'+opt('ins','Садэпохом (4대보험)',s.scheme)+opt('free','3,3%',s.scheme)+'</select></div>'+
+    '<div class="field"><label for="s-scheme">Оформление</label><select id="s-scheme" onchange="setS(\'scheme\',this.value)">'+opt('ins','Садэпохом (4대보험)',s.scheme)+opt('free','3,3%',s.scheme)+opt('pct','Другой процент',s.scheme)+'</select></div>'+
+    (s.scheme==='pct'?numField('s-pct','Процент удержания, %','pct',0.1,'как в вашей ведомости'):'')+
+    '<div class="field"><label for="s-wd">Рабочие дни<small>пустой рабочий день считается пропуском</small></label><select id="s-wd" onchange="setS(\'workDays\',+this.value)">'+opt('5','Пн–Пт',String(s.workDays))+opt('6','Пн–Сб',String(s.workDays))+'</select></div>'+
     numField('s-rate','Ставка в час, ₩','rate',10)+
     '<div class="field"><label for="s-start">Дата начала работы<small>нужна для ёнча и выходного пособия</small></label><input id="s-start" type="date" value="'+esc(s.startDate)+'" onchange="setS(\'startDate\',this.value)"></div></div>';
-  h+='<div class="card"><p class="h">Дневная смена</p>'+timeField('s-da','Начало','dStart')+timeField('s-db','Конец','dEnd')+numField('s-dbr','Перерывы, мин','dBreak',10)+'</div>';
-  h+='<div class="card"><p class="h">Ночная смена</p>'+timeField('s-na','Начало','nStart')+timeField('s-nb','Конец','nEnd')+numField('s-nbr','Перерывы, мин','nBreak',10)+'</div>';
+  h+='<div class="card"><p class="h">Дневная смена</p>'+timeField('s-da','Начало','dStart')+timeField('s-db','Конец','dEnd')+numField('s-dbr','Перерывы, мин','dBreak',10,'изменение пересчитает смены открытого месяца')+'</div>';
+  h+='<div class="card"><p class="h">Ночная смена</p>'+timeField('s-na','Начало','nStart')+timeField('s-nb','Конец','nEnd')+numField('s-nbr','Перерывы, мин','nBreak',10,'изменение пересчитает смены открытого месяца')+'</div>';
   h+='<div class="card"><p class="h">Бонусы</p>'+
     checkField('s-w','Недельный бонус (чухю)','weekly','8 часов за неделю без пропусков')+
     checkField('s-m','Месячный бонус','monthly','за месяц без пропусков')+
@@ -460,7 +469,7 @@ function renderSet(){
     '<div class="field"><label for="s-v">Виза</label>'+visaSel('s-v','setS(\'visa\',this.value,true)')+'</div>'+
     checkField('s-p','Удерживают пенсию','pension','подставлено по гражданству, можно изменить')+
     checkField('s-e','Удерживают страхование занятости','emp','подставлено по визе, можно изменить');
-  else h+='<p class="muted" style="margin:0 0 10px">При оформлении 3,3% страховки не удерживаются, гражданство и виза на расчёт не влияют.</p>';
+  else h+='<p class="muted" style="margin:0 0 10px">При таком оформлении страховки не удерживаются, гражданство и виза на расчёт не влияют.</p>';
   h+='<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px"><button class="btn quiet" onclick="clearMonth()">Очистить '+MONTHS[view.m].toLowerCase()+' '+view.y+'</button>'+
     '<button class="btn quiet" onclick="restartOnb()">Пройти вопросы заново</button>'+
     '<button class="btn quiet" onclick="resetAll()">Стереть все данные</button></div></details></div></div>';
@@ -476,7 +485,8 @@ function renderOnb(){
   if(obStep===0){
     h+='<h1>Как вы оформлены на заводе?</h1><p class="muted" style="margin:0">От этого зависит, что удерживают из зарплаты.</p>'+
       '<button class="choice" onclick="obScheme(\'ins\')"><b>Садэпохом</b><span>Официально, удерживают 4 страховки и налог</span></button>'+
-      '<button class="choice" onclick="obScheme(\'free\')"><b>3,3%</b><span>Удерживают только налог 3,3%</span></button>';
+      '<button class="choice" onclick="obScheme(\'free\')"><b>3,3%</b><span>Удерживают только налог 3,3%</span></button>'+
+      '<button class="choice" onclick="obScheme(\'pct\')"><b>Другой процент</b><span>Например, 4%, как бывает у фирм-посредников</span></button>';
   }else if(obStep===1){
     h+='<h1>Гражданство и виза</h1><p class="muted" style="margin:0">От них зависит, удерживают ли пенсию и страхование занятости.</p>'+
       '<div class="card"><div class="field"><label for="o-c">Гражданство</label>'+countrySel('o-c')+'</div>'+
@@ -484,13 +494,14 @@ function renderOnb(){
       '<button class="btn primary" onclick="obNext()">Далее</button>';
   }else if(obStep===2){
     h+='<h1>Какая у вас ставка в час?</h1><p class="muted" style="margin:0">Минимальная по закону в 2026 году: '+fmt(MIN_WAGE)+' ₩.</p>'+
-      '<div class="card"><div class="field"><label for="o-r">Ставка в час, ₩</label><input id="o-r" type="number" min="0" step="10" inputmode="numeric" value="'+s.rate+'"></div></div>'+
+      '<div class="card"><div class="field"><label for="o-r">Ставка в час, ₩</label><input id="o-r" type="number" min="0" step="10" inputmode="numeric" value="'+s.rate+'"></div>'+(s.scheme==='pct'?'<div class="field"><label for="o-p">Процент удержания, %<small>как в вашей ведомости</small></label><input id="o-p" type="number" min="0" step="0.1" inputmode="decimal" value="'+s.pct+'"></div>':'')+'</div>'+
       '<button class="btn primary" onclick="obNext()">Далее</button>';
   }else if(obStep===3){
     h+='<h1>Во сколько дневная смена?</h1><p class="muted" style="margin:0">Ночная смена подставится зеркально. Часы можно поменять в настройках.</p>'+
       '<div class="card"><div class="field"><label for="o-a">Начало</label><input id="o-a" type="time" value="'+esc(s.dStart)+'"></div>'+
       '<div class="field"><label for="o-b">Конец</label><input id="o-b" type="time" value="'+esc(s.dEnd)+'"></div>'+
-      '<div class="field"><label for="o-br">Перерывы, мин<small>обед и перекуры, не оплачиваются</small></label><input id="o-br" type="number" min="0" step="10" inputmode="numeric" value="'+s.dBreak+'"></div></div>'+
+      '<div class="field"><label for="o-br">Перерывы, мин<small>обед и перекуры, не оплачиваются</small></label><input id="o-br" type="number" min="0" step="10" inputmode="numeric" value="'+s.dBreak+'"></div>'+
+      '<div class="field"><label for="o-wd">Рабочие дни</label><select id="o-wd">'+opt('5','Пн–Пт',String(s.workDays))+opt('6','Пн–Сб',String(s.workDays))+'</select></div></div>'+
       '<button class="btn primary" onclick="obNext()">Далее</button>';
   }else{
     h+='<h1>Какие бонусы у вас есть?</h1><p class="muted" style="margin:0">Приложение само проверит по сменам, положен ли бонус.</p>'+
@@ -503,12 +514,12 @@ function renderOnb(){
 }
 function val(id){return document.getElementById(id).value;}
 function obScheme(v){st.s.scheme=v;obStep=v==='ins'?1:2;renderOnb();}
-function obBack(){obStep=(obStep===2&&st.s.scheme==='free')?0:obStep-1;renderOnb();}
+function obBack(){obStep=(obStep===2&&st.s.scheme!=='ins')?0:obStep-1;renderOnb();}
 function obNext(){
   var s=st.s;
   if(obStep===1){s.country=val('o-c');s.visa=val('o-v');autoRules();}
-  else if(obStep===2){s.rate=+val('o-r')||MIN_WAGE;}
-  else if(obStep===3){s.dStart=val('o-a')||'08:00';s.dEnd=val('o-b')||'20:00';s.dBreak=+val('o-br')||0;s.nStart=s.dEnd;s.nEnd=s.dStart;s.nBreak=s.dBreak;}
+  else if(obStep===2){s.rate=+val('o-r')||MIN_WAGE;if(s.scheme==='pct')s.pct=+String(val('o-p')).replace(',','.')||0;}
+  else if(obStep===3){s.dStart=val('o-a')||'08:00';s.dEnd=val('o-b')||'20:00';s.dBreak=+val('o-br')||0;s.nStart=s.dEnd;s.nEnd=s.dStart;s.nBreak=s.dBreak;s.workDays=+val('o-wd')||5;}
   else{s.weekly=document.getElementById('o-w').checked;s.monthly=document.getElementById('o-m').checked;s.monthlyAmt=+val('o-ma')||0;s.onboarded=true;save();render();return;}
   obStep++;renderOnb();
 }
@@ -534,10 +545,12 @@ function render(){
 /* ---------- actions ---------- */
 function go(t){view.tab=t;render();window.scrollTo(0,0);}
 function shift(n){var d=new Date(view.y,view.m+n,1);view.y=d.getFullYear();view.m=d.getMonth();render();}
-function setS(key,val,auto){st.s[key]=val;if(auto)autoRules();save();render();}
+function setS(key,val,auto){
+  if(key==='dBreak'||key==='nBreak'){var old=+st.s[key]||0,sa=key==='dBreak'?st.s.dStart:st.s.nStart,pre=ym()+'-';Object.keys(st.days).forEach(function(dk){var r=st.days[dk];if(dk.indexOf(pre)===0&&r.t==='s'&&r.a===sa&&(+r.br||0)===old)r.br=+val||0;});}
+  st.s[key]=val;if(auto)autoRules();save();render();}
 function setMonthVal(kind,val){var v=+val||0;if(v>0)st[kind][ym()]=v;else delete st[kind][ym()];save();render();}
 
-function isWeekend(key){var p=key.split('-'),d=new Date(+p[0],+p[1]-1,+p[2]);return (d.getDay()+6)%7>=5;}
+function isWeekend(key){var p=key.split('-'),d=new Date(+p[0],+p[1]-1,+p[2]);return (d.getDay()+6)%7>=(+st.s.workDays||5);}
 function preset(kind){var s=st.s;return kind==='n'?{a:s.nStart,b:s.nEnd,br:+s.nBreak||0}:{a:s.dStart,b:s.dEnd,br:+s.dBreak||0};}
 function quick(key,kind){var p=preset(kind);st.days[key]={t:'s',a:p.a,b:p.b,br:p.br,h:isWeekend(key)?1:0};save();render();}
 function tapDay(key){if(st.days[key])openDay(key);else quick(key,'d');}
@@ -559,12 +572,13 @@ function openDay(key){
   document.getElementById('fb').value=rec&&rec.b||pr.b;
   document.getElementById('fbr').value=rec&&rec.br!=null?rec.br:pr.br;
   document.getElementById('fh').checked=rec&&rec.t==='s'?!!rec.h:isWeekend(key);
+  document.getElementById('fhrs').value=rec&&rec.hrs!=null?rec.hrs:'';
   segChange(false);
   document.getElementById('dlg').showModal();
 }
 function saveDay(){
   var v=curSt()||'o';
-  if(v==='d'||v==='n'){var p=preset(v);st.days[editKey]={t:'s',a:val('fa')||p.a,b:val('fb')||p.b,br:+val('fbr')||0,h:document.getElementById('fh').checked?1:0};}
+  if(v==='d'||v==='n'){var p=preset(v);st.days[editKey]={t:'s',a:val('fa')||p.a,b:val('fb')||p.b,br:+val('fbr')||0,h:document.getElementById('fh').checked?1:0};var hv=String(val('fhrs')).replace(',','.');if(hv!==''&&!isNaN(+hv))st.days[editKey].hrs=+hv;}
   else st.days[editKey]={t:v};
   save();document.getElementById('dlg').close();render();
 }
